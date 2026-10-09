@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DHT11 Dashboard</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        darkbg: '#0f172a',    // slate-900
+                        darkcard: '#1e293b',  // slate-800
+                        darkborder: '#334155' // slate-700
+                    },
+                    boxShadow: {
+                        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Load Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        /* Custom scrollbar for a cleaner look */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .dark ::-webkit-scrollbar-thumb { background: #475569; }
+        
+        /* Pulse animation for active status */
+        @keyframes pulse-soft {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
+        }
+        .animate-pulse-soft { animation: pulse-soft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-darkbg min-h-screen flex flex-col text-gray-800 dark:text-gray-100 transition-colors duration-300 antialiased m-0">
+
+    <nav class="bg-white dark:bg-darkcard border-b border-gray-200 dark:border-darkborder sticky top-0 z-10 transition-colors duration-300">
+        <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+            
+            <!-- Left: Logo/Title & Status -->
+            <div class="flex items-center space-x-6">
+                <div class="flex items-center space-x-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-blue-600 dark:text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        
+                    </svg>
+                    <span class="font-bold text-lg tracking-tight">DHT11 Dashboard</span>
+                </div>
+                
+                <!-- Professional Status Pill -->
+                <div id="status-pill" class="flex items-center space-x-2 bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 px-3 py-1.5 rounded-full transition-all duration-300">
+                    <div id="status-dot" class="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500"></div>
+                    <span id="status-label" class="text-xs font-medium text-gray-600 dark:text-gray-400">Disconnected</span>
+                </div>
+            </div>
+
+            <!-- Right: Dark Mode Toggle (Defaults to Sun since Dark Mode is active) -->
+            <button onclick="toggleDarkMode()" class="p-2 rounded-lg bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/50">
+                <svg id="theme-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                </svg>
+            </button>
+        </div>
+    </nav>
+
+    <main class="flex-grow w-full max-w-6xl mx-auto px-6 py-8 flex flex-col gap-6">
+        
+        <!-- Top Metrics Row -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            <!-- Connection Control Card -->
+            <div class="bg-white dark:bg-darkcard rounded-2xl p-6 border border-gray-100 dark:border-darkborder shadow-soft flex flex-col justify-center transition-colors duration-300">
+                <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4">Device Control</h3>
+                <div class="flex flex-col gap-3">
+                    <select id="port-selector" disabled class="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-2.5 text-sm text-gray-500 dark:text-gray-400 cursor-not-allowed transition-colors appearance-none outline-none">
+                        <option>Browser Managed Port</option>
+                    </select>
+                    
+                    <button id="connect-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-all duration-200 shadow-sm shadow-blue-600/30 active:scale-[0.98]" onclick="toggleConnection()">
+                        Connect to Arduino
+                    </button>
+                </div>
+            </div>
+
+            <!-- Temperature Card -->
+            <div class="bg-white dark:bg-darkcard rounded-2xl p-6 border border-gray-100 dark:border-darkborder shadow-soft relative overflow-hidden transition-colors duration-300 group">
+                <div class="absolute top-0 right-0 p-6 opacity-10 dark:opacity-5 group-hover:scale-110 transition-transform duration-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"></path>
+                    </svg>
+                </div>
+                <div class="relative z-10 flex flex-col h-full justify-between">
+                    <div class="flex items-center gap-2">
+                        <div class="p-2 bg-red-50 dark:bg-red-500/10 rounded-lg">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"></path></svg>
+                        </div>
+                        <span class="text-sm font-semibold text-gray-500 dark:text-gray-400">Temperature</span>
+                    </div>
+                    <div class="mt-4 flex items-baseline gap-1">
+                        <div id="temp-label" class="text-5xl font-bold tracking-tight text-gray-900 dark:text-white">0.0</div>
+                        <span class="text-xl font-semibold text-red-500">°C</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Humidity Card -->
+            <div class="bg-white dark:bg-darkcard rounded-2xl p-6 border border-gray-100 dark:border-darkborder shadow-soft relative overflow-hidden transition-colors duration-300 group">
+                <div class="absolute top-0 right-0 p-6 opacity-10 dark:opacity-5 group-hover:scale-110 transition-transform duration-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"></path>
+                    </svg>
+                </div>
+                <div class="relative z-10 flex flex-col h-full justify-between">
+                    <div class="flex items-center gap-2">
+                        <div class="p-2 bg-blue-50 dark:bg-blue-500/10 rounded-lg">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"></path></svg>
+                        </div>
+                        <span class="text-sm font-semibold text-gray-500 dark:text-gray-400">Humidity</span>
+                    </div>
+                    <div class="mt-4 flex items-baseline gap-1">
+                        <div id="hum-label" class="text-5xl font-bold tracking-tight text-gray-900 dark:text-white">0.0</div>
+                        <span class="text-xl font-semibold text-blue-500">%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-darkcard rounded-2xl p-6 border border-gray-100 dark:border-darkborder shadow-soft transition-colors duration-300 w-full flex flex-col">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-base font-semibold text-gray-800 dark:text-gray-200">Real-Time Graph</h3>
+                <div class="flex items-center space-x-4 text-xs font-medium">
+                    <div class="flex items-center space-x-1.5"><span class="w-3 h-3 rounded-full bg-red-500"></span><span class="text-gray-500">Temp</span></div>
+                    <div class="flex items-center space-x-1.5"><span class="w-3 h-3 rounded-full bg-blue-500"></span><span class="text-gray-500">Hum</span></div>
+                </div>
+            </div>
+            <!-- Scaled down container for the chart to keep things neat -->
+            <div class="relative w-full h-[320px] md:h-[400px]">
+                <canvas id="sensorChart"></canvas>
+            </div>
+        </div>
+    </main>
+
+    <!-- Error Modal -->
+    <div id="errorModal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 transition-opacity">
+        <div class="bg-white dark:bg-darkcard p-6 rounded-2xl shadow-2xl max-w-sm w-full mx-4 border border-gray-100 dark:border-darkborder">
+            <div class="flex items-center space-x-3 mb-4">
+                <div class="p-2 bg-red-50 dark:bg-red-500/10 rounded-full">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                </div>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white">Connection Error</h2>
+            </div>
+            <p id="errorText" class="text-sm text-gray-600 dark:text-gray-400 mb-6 leading-relaxed"></p>
+            <div class="text-right">
+                <button onclick="closeModal()" class="bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 font-medium py-2 px-5 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-slate-500">Dismiss</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data and Graph Variables
+        const maxDataPoints = 20;
+        const times = [];
+        const temps = [];
+        const hums = [];
+
+        // State Variables
+        let isConnected = false;
+        let port = null;
+        let reader = null;
+        let readPromise = null;
+        
+        // Animation Variables
+        let targetTemp = 0.0;
+        let targetHum = 0.0;
+        let displayTemp = 0.0;
+        let displayHum = 0.0;
+
+        // UI Elements
+        const statusLabel = document.getElementById('status-label');
+        const statusDot = document.getElementById('status-dot');
+        const statusPill = document.getElementById('status-pill');
+        const connectBtn = document.getElementById('connect-btn');
+        const tempLabel = document.getElementById('temp-label');
+        const humLabel = document.getElementById('hum-label');
+        const portSelector = document.getElementById('port-selector');
+
+        // Initialize Chart.js
+        const ctx = document.getElementById('sensorChart').getContext('2d');
+        
+        const getChartColors = () => {
+            const isDark = document.documentElement.classList.contains('dark');
+            return {
+                grid: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)',
+                text: isDark ? '#94a3b8' : '#64748b' // slate-400 / slate-500
+            };
+        };
+
+        let currentColors = getChartColors();
+        Chart.defaults.font.family = "'Inter', sans-serif";
+
+        const sensorChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: times,
+                datasets: [
+                    {
+                        label: 'Temperature (°C)',
+                        data: temps,
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        borderWidth: 2.5,
+                        tension: 0.3, 
+                        pointRadius: 0, 
+                        pointHoverRadius: 6,
+                        pointBackgroundColor: '#ef4444',
+                        fill: true
+                    },
+                    {
+                        label: 'Humidity (%)',
+                        data: hums,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2.5,
+                        tension: 0.3,
+                        pointRadius: 0,
+                        pointHoverRadius: 6,
+                        pointBackgroundColor: '#3b82f6',
+                        fill: true
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false, 
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                layout: { padding: { top: 10 } },
+                scales: {
+                    y: {
+                        min: 0,
+                        max: 100, 
+                        ticks: {
+                            stepSize: 20,
+                            color: currentColors.text,
+                            font: { size: 11, weight: '500' },
+                            padding: 10
+                        },
+                        grid: {
+                            color: currentColors.grid,
+                            drawBorder: false,
+                        },
+                        border: { display: false }
+                    },
+                    x: {
+                        grid: { display: false }, 
+                        ticks: {
+                            maxRotation: 0,
+                            autoSkip: true,
+                            maxTicksLimit: 6,
+                            color: currentColors.text,
+                            font: { size: 11, weight: '500' },
+                            padding: 10
+                        },
+                        border: { display: false }
+                    }
+                },
+                plugins: {
+                    legend: { display: false }, 
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                        titleFont: { size: 13, weight: '600' },
+                        bodyFont: { size: 13 },
+                        padding: 12,
+                        cornerRadius: 8,
+                        displayColors: true,
+                        boxPadding: 4
+                    }
+                }
+            }
+        });
+
+        async function toggleConnection() {
+            if (!('serial' in navigator)) {
+                showError("Web Serial API is not supported in this browser. Please use Chrome, Edge, or Opera.");
+                return;
+            }
+
+            if (!isConnected) {
+                try {
+                    port = await navigator.serial.requestPort();
+                    await port.open({ baudRate: 9600 });
+                    
+                    isConnected = true;
+                    connectBtn.innerText = "Disconnect";
+                    connectBtn.className = "bg-red-500 hover:bg-red-600 text-white font-medium py-2.5 px-4 rounded-lg transition-all duration-200 shadow-sm shadow-red-500/30 active:scale-[0.98]";
+                    
+                    // Display connected port information (Vendor ID)
+                    const portInfo = port.getInfo();
+                    if (portInfo.usbVendorId) {
+                        const vendorId = portInfo.usbVendorId.toString(16).toUpperCase();
+                        portSelector.options[0].text = `USB Device (VID: 0x${vendorId})`;
+                    } else {
+                        portSelector.options[0].text = `Connected Serial Device`;
+                    }
+                    
+                    // Update Status Pill
+                    statusLabel.innerText = "Connected";
+                    statusLabel.className = "text-xs font-medium text-emerald-700 dark:text-emerald-400";
+                    statusDot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse-soft";
+                    statusPill.className = "flex items-center space-x-2 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 px-3 py-1.5 rounded-full transition-all duration-300";
+                    
+                    // Reset variables
+                    displayTemp = 0.0; displayHum = 0.0; targetTemp = 0.0; targetHum = 0.0;
+                    tempLabel.innerText = "0.0"; humLabel.innerText = "0.0";
+                    times.length = 0; temps.length = 0; hums.length = 0;
+                    
+                    updateDashboard(0.0, 0.0);
+                    readLoop();
+                    
+                } catch (e) {
+                    showError("Could not connect. Ensure the Arduino is plugged in and the Serial Monitor in your IDE is closed.");
+                }
+            } else {
+                await disconnect();
+            }
+        }
+
+        async function disconnect() {
+            isConnected = false;
+            try {
+                if (reader) { await reader.cancel(); reader = null; }
+                if (readPromise) { await readPromise.catch(() => {}); }
+                if (port) { await port.close(); port = null; }
+            } catch (error) {
+                console.error("Disconnect error:", error);
+            }
+            
+            // Reset UI
+            connectBtn.innerText = "Connect to Arduino";
+            connectBtn.className = "bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-all duration-200 shadow-sm shadow-blue-600/30 active:scale-[0.98]";
+            
+            portSelector.options[0].text = "Browser Managed Port";
+            
+            statusLabel.innerText = "Disconnected";
+            statusLabel.className = "text-xs font-medium text-gray-600 dark:text-gray-400";
+            statusDot.className = "w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500";
+            statusPill.className = "flex items-center space-x-2 bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 px-3 py-1.5 rounded-full transition-all duration-300";
+        }
+
+        async function readLoop() {
+            const textDecoder = new TextDecoderStream();
+            readPromise = port.readable.pipeTo(textDecoder.writable);
+            reader = textDecoder.readable.getReader();
+            let lineBuffer = "";
+            
+            while (true) {
+                try {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    
+                    if (value) {
+                        lineBuffer += value;
+                        let lines = lineBuffer.split(/\r?\n/);
+                        lineBuffer = lines.pop(); 
+                        
+                        for (let line of lines) {
+                            processArduinoData(line.trim());
+                        }
+                    }
+                } catch (e) {
+                    if (isConnected) console.error("Read error:", e);
+                    break;
+                }
+            }
+        }
+
+        function processArduinoData(raw_line) {
+            if (raw_line.includes("Temp:") && raw_line.includes("Humidity:")) {
+                try {
+                    let parts = raw_line.split(',');
+                    let t_val = parseFloat(parts[0].split(':')[1]);
+                    let h_val = parseFloat(parts[1].split(':')[1]);
+                    
+                    if (!isNaN(t_val) && !isNaN(h_val)) {
+                        targetTemp = t_val;
+                        targetHum = h_val;
+                        updateDashboard(t_val, h_val);
+                    }
+                } catch (e) { /* Ignore malformed lines */ }
+            }
+        }
+
+        function updateDashboard(temp, hum) {
+            let now = new Date();
+            let timeString = now.getHours().toString().padStart(2, '0') + ':' + 
+                             now.getMinutes().toString().padStart(2, '0') + ':' + 
+                             now.getSeconds().toString().padStart(2, '0');
+                             
+            times.push(timeString);
+            temps.push(temp);
+            hums.push(hum);
+            
+            if (times.length > maxDataPoints) {
+                times.shift(); temps.shift(); hums.shift();
+            }
+            sensorChart.update();
+        }
+
+        // 1000ms animation loop tick (50ms interval = 20 steps)
+        setInterval(() => {
+            if (isConnected) {
+                let diff_t = targetTemp - displayTemp;
+                let diff_h = targetHum - displayHum;
+                
+                let step_t = Math.max(Math.abs(targetTemp / 20.0), 0.5);
+                let step_h = Math.max(Math.abs(targetHum / 20.0), 0.5);
+                
+                if (Math.abs(diff_t) > step_t) displayTemp += (diff_t > 0) ? step_t : -step_t;
+                else displayTemp = targetTemp;
+                
+                if (Math.abs(diff_h) > step_h) displayHum += (diff_h > 0) ? step_h : -step_h;
+                else displayHum = targetHum;
+                
+                tempLabel.innerText = displayTemp.toFixed(1);
+                humLabel.innerText = displayHum.toFixed(1);
+            }
+        }, 50);
+
+        function toggleDarkMode() {
+            const html = document.documentElement;
+            html.classList.toggle('dark');
+            
+            const icon = document.getElementById('theme-icon');
+            if (html.classList.contains('dark')) {
+                // Sun Icon for when dark mode is active
+                icon.innerHTML = '<circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>';
+            } else {
+                // Moon Icon for when light mode is active
+                icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>';
+            }
+            
+            let newColors = getChartColors();
+            sensorChart.options.scales.x.grid.color = newColors.grid;
+            sensorChart.options.scales.y.grid.color = newColors.grid;
+            sensorChart.options.scales.x.ticks.color = newColors.text;
+            sensorChart.options.scales.y.ticks.color = newColors.text;
+            sensorChart.update();
+        }
+
+        function showError(message) {
+            document.getElementById('errorText').innerText = message;
+            document.getElementById('errorModal').classList.remove('hidden');
+        }
+        function closeModal() {
+            document.getElementById('errorModal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
